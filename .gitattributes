@@ -5,6 +5,9 @@
 *.cmake text
 *.ino text
 *.py text
+*.h test
+*.hpp text
+*.cpp text
 *.mod text eol=crlf
 *.mod text eol=crlf
 *.pdf binary
