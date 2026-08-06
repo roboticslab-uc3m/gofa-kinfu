@@ -3,5 +3,8 @@
 *.md text
 *.txt text
 *.cmake text
+*.ino text
+*.py text
 *.mod text eol=crlf
 *.mod text eol=crlf
+*.pdf binary
