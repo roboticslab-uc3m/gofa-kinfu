@@ -11,3 +11,4 @@ José Ignacio Ros Pérez, *Diseño e integración de un sistema electromecánico
 ## See also
 
 - [roboticslab-uc3m/vision](https://github.com/roboticslab-uc3m/vision)
+- [roboticslab-uc3m/abb_wrapper](https://github.com/roboticslab-uc3m/abb_wrapper)
