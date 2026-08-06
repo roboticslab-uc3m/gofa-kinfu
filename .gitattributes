@@ -1,0 +1,7 @@
+* text=auto
+*.yml text
+*.md text
+*.txt text
+*.cmake text
+*.mod text eol=crlf
+*.mod text eol=crlf
