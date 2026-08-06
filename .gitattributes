@@ -5,7 +5,7 @@
 *.cmake text
 *.ino text
 *.py text
-*.h test
+*.h text
 *.hpp text
 *.cpp text
 *.mod text eol=crlf
