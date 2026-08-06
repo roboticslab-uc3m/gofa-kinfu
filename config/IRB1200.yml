@@ -25,7 +25,7 @@ dh_parameters:
     alpha: 0
     d: 82
     theta: 180
-    
+
 joint_limits:
   - min: -170.0
     max: 170.0

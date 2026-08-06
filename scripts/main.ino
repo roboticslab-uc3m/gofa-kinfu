@@ -5,14 +5,14 @@ const float resolution = 1.8;
 
 void setup()
 {
-    Serial.begin(9600); // Inicializa la comunicaci´on serie a 9600 bps
+    Serial.begin(9600); // Inicializa la comunicación serie a 9600 bps
     pinMode(STEP, OUTPUT);
     pinMode(DIR, OUTPUT);
 }
 
 void loop()
 {
-    // Si hay alg´un mensaje disponible por el BUS de serie, se ejecuta
+    // Si hay algún mensaje disponible por el BUS de serie, se ejecuta
     if (Serial.available() > 0)
     {
         // Lee el mensaje enviado desde Python
@@ -23,7 +23,7 @@ void loop()
 
         // Inicializa las variables para almacenar los grados y tiempo de giro
         int angle = 0;
-        int turning_time = 0;
+        long turning_time = 0;
 
         // Mapea el mensaje para extraer los grados y el tiempo de giro
         int indexG = mensaje.indexOf('G');
@@ -52,25 +52,43 @@ void loop()
     }
 }
 
-void move(int angle, int turning_time)
+void move(int angle, long turning_time)
 {
-    digitalWrite(DIR, HIGH); // Activamos un sentido de giro
+    // Activamos sentido horario fijo
+    digitalWrite(DIR, LOW);
 
-    int steps = angle / resolution;
+    // Calculamos los pasos necesarios (180 / 1.8 = 100 pasos)
+    int steps = abs(angle) / resolution;
 
     Serial.print("Se ejecutarán ");
     Serial.print(steps);
     Serial.println(" pasos de motor");
 
-    int ms = (turning_time * resolution) / (2 * angle);
+    // === CÁLCULO SEGURO EN MILISEGUNDOS CON DECIMALES ===
+    // 1. Calculamos cuánto dura cada medio paso en milisegundos enteros
+    float tiempo_medio_paso_ms = ((float)turning_time * resolution) / (2.0 * (float)abs(angle));
 
+    // 2. Separamos la parte entera (ms) y la parte decimal (us)
+    long ms_enteros = (long)tiempo_medio_paso_ms;
+    long us_restantes = (long)((tiempo_medio_paso_ms - (float)ms_enteros) * 1000.0);
+
+    Serial.print("Delay combinado: ");
+    Serial.print(ms_enteros);
+    Serial.print(" ms y ");
+    Serial.print(us_restantes);
+    Serial.println(" microsegundos.");
+
+    // Bucle de movimiento mixto (Ultra preciso y sin límites de desbordamiento)
     for (int i = 0; i < steps; i++)
     {
-        digitalWrite(STEP, HIGH); // Nivel alto
-        delay(ms);                // Durante un tiempo "ms" en milisegundos
-        digitalWrite(STEP, LOW);  // Nivel bajo
-        delay(ms);                // Durante un tiempo "ms" en milisegundos
+        digitalWrite(STEP, HIGH);
+        delay(ms_enteros);               // Espera la parte gorda en milisegundos (ej: 235 ms)
+        delayMicroseconds(us_restantes); // Ajusta el pico de decimales pequeño (ej: 615 us)
+
+        digitalWrite(STEP, LOW);
+        delay(ms_enteros);
+        delayMicroseconds(us_restantes);
     }
 
-    delay(2000); // Demora de 2 segundos
+    delay(2000);
 }
