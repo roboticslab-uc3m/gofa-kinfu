@@ -27,12 +27,14 @@ struct JointLimits
 class Robot
 {
 public:
+    enum joint_flag {REACHABLE, UNREACHABLE};
+
     Robot();
     Robot(const std::string & filename);
 
     bool handleExecute(double speed, double radius, std::vector<double> initialJointPositions);
-    bool Simultaneo(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
-    bool Secuencial(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
+    bool doSimultaneous(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
+    bool doSequential(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
 
     bool handleSolveIK(const std::vector<Point> & points, const TrajectoryGenerator & trajectory, bool debug);
     bool handlePlotJoints(const TrajectoryGenerator & trajectory, bool debug, const std::string & filename = "");
@@ -44,7 +46,7 @@ private:
     std::vector<DHParameters> dh_params;
     std::vector<JointLimits> jointLimits;
     std::vector<std::vector<double>> jointTrajectory;
-    std::vector<double> jointFlags;
+    std::vector<joint_flag> jointFlags;
 
     abb::egm::wrapper::trajectory::TrajectoryGoal goal;
 };

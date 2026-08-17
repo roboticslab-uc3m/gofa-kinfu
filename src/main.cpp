@@ -81,10 +81,10 @@ int main(int argc, char ** argv)
             ("help", "Show help message\n")
             ("debug", "Enable debug mode")
             ("generate", po::value<std::string>(), "Generate parameters\n")
-            ("plot", po::value<std::string>()->implicit_value(""), "Plot points\n")
-            ("robot", po::value<std::string>(), "Robot YAML file\n")
-            ("solveIK", "Execute inverse kinematics\n")
-            ("plot_joints", po::value<std::string>()->implicit_value(""), "Plot joints\n")
+            ("plot", po::value<std::string>()->implicit_value(""), "Plot Cartesian trajectory\n")
+            ("robot", po::value<std::string>(), "Load robot YAML file\n")
+            ("solve_ik", "Execute inverse kinematics\n")
+            ("plot_joints", po::value<std::string>()->implicit_value(""), "Plot joint trajectories\n")
             ("execute", "Execute movements\n");
 
         po::variables_map vm;
@@ -117,10 +117,9 @@ int main(int argc, char ** argv)
                 throw std::invalid_argument("trajectory generation failed");
             }
         }
-        else if (vm.count("plot_joints") || vm.count("solveIK"))
+        else if (vm.count("plot_joints") || vm.count("solve_ik"))
         {
-            // Carga por defecto para que input_params no esté vacío
-            generator->parseInputParameters("input_parameters.yml");
+            generator = TrajectoryGenerator::parseInputParameters("input_parameters.yml");
         }
 
         if (vm.count("plot"))
@@ -128,24 +127,22 @@ int main(int argc, char ** argv)
             generator->handlePlot(vm["plot"].as<std::string>());
         }
 
-        // Sacamos la llamada de los condicionales para que se ejecute siempre que esté el flag
         if (vm.count("robot"))
         {
             std::string robot_file = vm["robot"].as<std::string>();
             robot = Robot(robot_file); // Se carga siempre aquí
 
-            // Si solo se quiere visualizar la info del robot (sin otras acciones)
             if (vm.size() == 1 || (vm.size() == 2 && debug))
             {
                 loadRobotData(robot_file);
             }
         }
 
-        if (vm.count("solveIK"))
+        if (vm.count("solve_ik"))
         {
             if (!vm.count("robot"))
             {
-                std::cerr << "Error: --solveIK requires --robot\n";
+                std::cerr << "Error: --solve_ik requires --robot\n";
                 return 1;
             }
 
