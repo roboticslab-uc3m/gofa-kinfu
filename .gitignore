@@ -30,3 +30,5 @@
 # Miscellanea
 **/build*/
 *.Zone.Identifier
+.vs/
+.vscode/

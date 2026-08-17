@@ -14,10 +14,10 @@ find_package(yaml-cpp REQUIRED)
 find_package(ROBOTICSLAB_VISION REQUIRED)
 
 add_executable(${PROJECT_NAME} src/main.cpp
-                               src/trajectory_generator.cpp
-                               src/robot.cpp
-                               include/trajectory_generator.h
-                               include/robot.h)
+                               src/TrajectoryGenerator.cpp
+                               src/Robot.cpp
+                               include/TrajectoryGenerator.h
+                               include/Robot.h)
 
 target_link_libraries(${PROJECT_NAME} ${abb_libegm_LIBRARIES}
                                       Boost::thread
