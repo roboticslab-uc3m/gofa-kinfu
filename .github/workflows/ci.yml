@@ -9,48 +9,28 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
 env:
   CMAKE_C_COMPILER_LAUNCHER: ccache
   CMAKE_CXX_COMPILER_LAUNCHER: ccache
   CMAKE_BUILD_TYPE: Debug
 
 jobs:
-  maybe_skip:
-    runs-on: ubuntu-slim
-    outputs:
-      should_skip: ${{steps.skip_check.outputs.should_skip}}
-    steps:
-    - uses: fkirc/skip-duplicate-actions@v5
-      id: skip_check
-      with:
-        cancel_others: 'true'
-
   build:
-    name: build (${{matrix.system.os}}, ${{matrix.robotology.yarp}}, ${{matrix.system.compiler.cc}})
+    name: build (${{matrix.compiler.cc}})
     runs-on: ubuntu-latest
     container:
-      image: ros:${{matrix.system.ros}}-ros-core
-    needs: maybe_skip
-    if: ${{needs.maybe_skip.outputs.should_skip != 'true'}}
+      image: ros:rolling-ros-core
 
     strategy:
       fail-fast: false
       matrix:
-        system:
-        - { os: ubuntu-24.04, ros: jazzy,   compiler: { cc: gcc-13,   cxx: g++-13,     apt: g++-13 } }
-        - { os: ubuntu-24.04, ros: jazzy,   compiler: { cc: clang-18, cxx: clang++-18, apt: clang-18 } }
-        - { os: ubuntu-26.04, ros: lyrical, compiler: { cc: gcc-15,   cxx: g++-15,     apt: g++-15 } }
-        - { os: ubuntu-26.04, ros: lyrical, compiler: { cc: clang-21, cxx: clang++-21, apt: clang-21 } }
-        robotology:
-        # CMake 3.20 instead of 3.19 because of ROS Jazzy
-        # CMake 3.22 instead of 3.20 because of the CMAKE_BUILD_TYPE env var
-        - { yarp: yarp-3.11, cmake: 3.22.x }
-        - { yarp: yarp-3.12, cmake: 3.22.x }
-        - { yarp: master,    cmake: 3.22.x }
-        experimental:
-        - ${{github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'}}
-        exclude:
-        - { experimental: false, robotology: { yarp: master } }
+        compiler:
+        - { cc: gcc,   cxx: g++,     apt: g++ }
+        - { cc: clang, cxx: clang++, apt: clang }
 
     steps:
     - name: Check out main project
@@ -66,7 +46,6 @@ jobs:
       uses: actions/checkout@v7
       with:
         repository: robotology/yarp
-        ref: ${{matrix.robotology.yarp}}
         path: .deps/yarp
 
     - name: Check out abb_wrapper
@@ -88,22 +67,17 @@ jobs:
         path: .deps/vision
 
     - name: Install dependencies via apt
-      run: apt-get update && apt-get install -qq ccache make ${{matrix.system.compiler.apt}} libprotobuf-dev libboost-thread-dev libboost-program-options-dev liborocos-kdl-dev libpython3-dev libyaml-cpp-dev
-
-    - name: Set up CMake
-      uses: jwlawson/actions-setup-cmake@v2
-      with:
-        cmake-version: ${{matrix.robotology.cmake}}
+      run: apt-get update && apt-get install -qq ccache make ${{matrix.compiler.apt}} libprotobuf-dev protobuf-compiler libboost-thread-dev libboost-program-options-dev liborocos-kdl-dev libpython3-dev libyaml-cpp-dev
 
     - name: Set up Ccache
       uses: hendrikmuhs/ccache-action@v1
       with:
-        key: ${{matrix.system.os}}-${{matrix.robotology.yarp}}-${{matrix.system.compiler.cc}}
+        key: ${{matrix.compiler.cc}}
 
     - name: Set environment variables
       run: |
-        echo "CC=${{matrix.system.compiler.cc}}" >> $GITHUB_ENV
-        echo "CXX=${{matrix.system.compiler.cxx}}" >> $GITHUB_ENV
+        echo "CC=${{matrix.compiler.cc}}" >> $GITHUB_ENV
+        echo "CXX=${{matrix.compiler.cxx}}" >> $GITHUB_ENV
 
     - name: Build YCM
       run: |
@@ -137,12 +111,12 @@ jobs:
 
     - name: Configure main project
       run: |
-        . /opt/ros/${{matrix.system.ros}}/setup.sh
+        . /opt/ros/rolling/setup.sh
         cmake -S . -B ./build
 
     - name: Compile main project
       run: |
-        . /opt/ros/${{matrix.system.ros}}/setup.sh
+        . /opt/ros/rolling/setup.sh
         cmake --build ./build
 
     - name: Install main project
