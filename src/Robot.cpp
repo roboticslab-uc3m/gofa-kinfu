@@ -212,7 +212,7 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
     }
 
     std::string serialCmd = "G" + std::to_string(angle) + "T" + std::to_string(turningTime) + "\n";
-    boost::asio::io_service ioSerial;
+    boost::asio::io_context ioSerial;
     boost::asio::serial_port serial(ioSerial);
     bool arduinoRet = false;
 
@@ -229,10 +229,10 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
         std::cerr << "Warning/Serial Port Error: " << e.what() << ". The script will continue without the physical platform.\n";
     }
 
-    boost::asio::io_service io_service;
-    boost::thread_group thread_group;
+    boost::asio::io_context ioContext;
+    boost::thread_group threadGroup;
 
-    abb::egm::EGMTrajectoryInterface egm_interface(io_service, 6510);
+    abb::egm::EGMTrajectoryInterface egm_interface(ioContext, 6510);
 
     if (!egm_interface.isInitialized())
     {
@@ -244,7 +244,7 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
         std::cout << "EGM interface initialized successfully\n";
     };
 
-    thread_group.create_thread(boost::bind(&boost::asio::io_service::run, &io_service));
+    threadGroup.create_thread(boost::bind(&boost::asio::io_context::run, &ioContext));
 
     while (!egm_interface.isConnected())
     {
@@ -281,7 +281,7 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
 
     std::cout << "Robot reached the safe point\n";
 
-    thread_group.create_thread(boost::bind(&boost::asio::io_service::run, &io_service));
+    threadGroup.create_thread(boost::bind(&boost::asio::io_context::run, &ioContext));
 
     while (!egm_interface.isConnected())
     {
@@ -317,7 +317,7 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
 
     std::cout << "Robot reached the first point\n";
 
-    thread_group.create_thread(boost::bind(&boost::asio::io_service::run, &io_service));
+    threadGroup.create_thread(boost::bind(&boost::asio::io_context::run, &ioContext));
 
     while (!egm_interface.isConnected())
     {
@@ -352,8 +352,8 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
         serial.close();
     }
 
-    io_service.stop();
-    thread_group.join_all();
+    ioContext.stop();
+    threadGroup.join_all();
 
     return true;
 }
