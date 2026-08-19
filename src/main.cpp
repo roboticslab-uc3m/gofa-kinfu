@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdlib>
 
 #include <iomanip>
 #include <iostream>
@@ -20,7 +21,7 @@ std::ostream & operator<<(std::ostream & os, const Point & point)
     return os;
 }
 
-void loadRobotData(const std::string & filename)
+void printRobotData(const std::string & filename)
 {
     try
     {
@@ -29,13 +30,11 @@ void loadRobotData(const std::string & filename)
         std::cout << "Robot configuration read from file: " << filename << std::endl;
         std::cout << "\n===================================\n";
 
-        // Mostrar el nombre del robot
         std::cout << "Robot:\n";
         std::cout << "  " << robot["robot"].as<std::string>() << std::endl;
 
         std::cout << "===================================\n";
 
-        // Mostrar los parámetros DH en formato tabla
         std::cout << "DH parameters:\n";
         std::cout << std::setw(8) << "theta" << std::setw(8) << "D" << std::setw(12) << "A" << std::setw(8) << "alpha" << "\n";
         std::cout << "  ----------------------------------------\n";
@@ -50,7 +49,6 @@ void loadRobotData(const std::string & filename)
 
         std::cout << "===================================\n";
 
-        // Mostrar los límites de las articulaciones en formato tabla
         std::cout << "Joint limits:\n";
         std::cout << std::setw(8) << "min" << std::setw(8) << "max" << "\n";
         std::cout << "  ------------\n";
@@ -71,7 +69,7 @@ void loadRobotData(const std::string & filename)
 
 int main(int argc, char ** argv)
 {
-    Robot robot;
+    std::unique_ptr<Robot> robot;
     std::unique_ptr<TrajectoryGenerator> generator;
 
     try {
@@ -96,7 +94,7 @@ int main(int argc, char ** argv)
         if (vm.count("help") || vm.empty())
         {
             std::cout << desc << std::endl;
-            return 1;
+            return EXIT_FAILURE;
         }
 
         if (vm.count("generate"))
@@ -129,12 +127,12 @@ int main(int argc, char ** argv)
 
         if (vm.count("robot"))
         {
-            std::string robot_file = vm["robot"].as<std::string>();
-            robot = Robot(robot_file); // Se carga siempre aquí
+            std::string robotFile = vm["robot"].as<std::string>();
+            robot = Robot::parseRobotConfiguration(robotFile);
 
             if (vm.size() == 1 || (vm.size() == 2 && debug))
             {
-                loadRobotData(robot_file);
+                printRobotData(robotFile);
             }
         }
 
@@ -143,27 +141,39 @@ int main(int argc, char ** argv)
             if (!vm.count("robot"))
             {
                 std::cerr << "Error: --solve_ik requires --robot\n";
-                return 1;
+                return EXIT_FAILURE;
             }
 
-            robot.handleSolveIK(generator->getGeneratedPoints(), *generator, debug);
+            robot->handleSolveIK(generator->getGeneratedPoints(), *generator, debug);
         }
 
         if (vm.count("plot_joints"))
         {
-            robot.handlePlotJoints(*generator, debug, vm["plot_joints"].as<std::string>());
+            if (!vm.count("robot"))
+            {
+                std::cerr << "Error: --plot_joints requires --robot\n";
+                return EXIT_FAILURE;
+            }
+
+            robot->handlePlotJoints(*generator, debug, vm["plot_joints"].as<std::string>());
         }
 
         if (vm.count("execute"))
         {
-            robot.handleExecute(generator->getSpeed(), generator->getRadius(), generator->getInitialJointPositions());
+            if (!vm.count("robot"))
+            {
+                std::cerr << "Error: --execute requires --robot\n";
+                return EXIT_FAILURE;
+            }
+
+            robot->handleExecute(generator->getSpeed(), generator->getRadius(), generator->getInitialJointPositions());
         }
     }
     catch (const std::exception & e)
     {
         std::cerr << "Error: " << e.what() << "\n";
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

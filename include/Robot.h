@@ -29,9 +29,6 @@ class Robot
 public:
     enum joint_flag {REACHABLE, UNREACHABLE};
 
-    Robot();
-    Robot(const std::string & filename);
-
     bool handleExecute(double speed, double radius, std::vector<double> initialJointPositions);
     bool doSimultaneous(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
     bool doSequential(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
@@ -39,11 +36,17 @@ public:
     bool handleSolveIK(const std::vector<Point> & points, const TrajectoryGenerator & trajectory, bool debug);
     bool handlePlotJoints(const TrajectoryGenerator & trajectory, bool debug, const std::string & filename = "");
 
+    static std::unique_ptr<Robot> parseRobotConfiguration(const std::string & filename);
+
 private:
+    Robot() = default;
+    Robot(const Robot &) = delete;
+    Robot & operator=(const Robot &) = delete;
+
     void parseDHParameters(const std::string & filename);
     void parseJointLimits(const std::string & filename);
 
-    std::vector<DHParameters> dh_params;
+    std::vector<DHParameters> dhParams;
     std::vector<JointLimits> jointLimits;
     std::vector<std::vector<double>> jointTrajectory;
     std::vector<joint_flag> jointFlags;

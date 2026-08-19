@@ -43,7 +43,7 @@ void Robot::parseDHParameters(const std::string & filename)
         dh.d = param["d"].as<double>();
         dh.theta = param["theta"].as<double>();
 
-        dh_params.push_back(dh);
+        dhParams.push_back(dh);
     }
 }
 
@@ -61,27 +61,22 @@ void Robot::parseJointLimits(const std::string & filename)
     }
 }
 
-Robot::Robot()
+std::unique_ptr<Robot> Robot::parseRobotConfiguration(const std::string & filename)
 {
-    DHParameters dh;
-    dh.a = 0;
-    dh.alpha = 0;
-    dh.d = 0;
-    dh.theta = 0;
+    // can't use std::make_unique here due to the private ctor
+    std::unique_ptr<Robot> robot(new Robot());
 
-    dh_params.push_back(dh);
-
-    JointLimits limits;
-    limits.min = 0;
-    limits.max = 0;
-
-    jointLimits.push_back(limits);
-}
-
-Robot::Robot(const std::string & filename)
-{
-    parseDHParameters(filename);
-    parseJointLimits(filename);
+    try
+    {
+        robot->parseDHParameters(filename);
+        robot->parseJointLimits(filename);
+        return robot;
+    }
+    catch (const YAML::Exception & e)
+    {
+        std::cerr << "Error parsing robot configuration file: " << e.what() << std::endl;
+        return nullptr;
+    }
 }
 
 bool Robot::doSimultaneous(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime)
@@ -365,7 +360,7 @@ bool Robot::handleSolveIK(const std::vector<Point> & points, const TrajectoryGen
 
     KDL::Chain chain;
 
-    for (const auto & dh : dh_params)
+    for (const auto & dh : dhParams)
     {
         chain.addSegment(KDL::Segment(KDL::Joint(KDL::Joint::RotZ), KDL::Frame::DH(dh.a, dh.alpha * KDL::deg2rad, dh.d, dh.theta * KDL::deg2rad)));
     }
