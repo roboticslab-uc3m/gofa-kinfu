@@ -1,0 +1,126 @@
+name: Continuous Integration
+
+on:
+  push:
+    paths-ignore:
+    - .github/workflows/doxygen.yml
+    - 'doc/**'
+    - '**.md'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+env:
+  CMAKE_C_COMPILER_LAUNCHER: ccache
+  CMAKE_CXX_COMPILER_LAUNCHER: ccache
+  CMAKE_BUILD_TYPE: Debug
+
+jobs:
+  build:
+    name: build (${{matrix.compiler.cc}})
+    runs-on: ubuntu-latest
+    container:
+      image: ros:rolling-ros-core
+
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+        - { cc: gcc,   cxx: g++,     apt: g++ }
+        - { cc: clang, cxx: clang++, apt: clang }
+
+    steps:
+    - name: Check out main project
+      uses: actions/checkout@v7
+
+    - name: Check out YCM
+      uses: actions/checkout@v7
+      with:
+        repository: robotology/ycm
+        path: .deps/ycm
+
+    - name: Check out YARP
+      uses: actions/checkout@v7
+      with:
+        repository: robotology/yarp
+        path: .deps/yarp
+
+    - name: Check out abb_wrapper
+      uses: actions/checkout@v7
+      with:
+        repository: roboticslab-uc3m/abb_wrapper
+        path: .deps/abb_wrapper
+
+    - name: Check out matplotlib-cpp
+      uses: actions/checkout@v7
+      with:
+        repository: lava/matplotlib-cpp
+        path: .deps/matplotlib-cpp
+
+    - name: Check out vision
+      uses: actions/checkout@v7
+      with:
+        repository: roboticslab-uc3m/vision
+        path: .deps/vision
+
+    - name: Install dependencies via apt
+      run: apt-get update && apt-get install -qq ccache make ${{matrix.compiler.apt}} libprotobuf-dev protobuf-compiler libboost-thread-dev libboost-program-options-dev liborocos-kdl-dev libpython3-dev libyaml-cpp-dev
+
+    - name: Set up Ccache
+      uses: hendrikmuhs/ccache-action@v1
+      with:
+        key: ${{matrix.compiler.cc}}
+
+    - name: Set environment variables
+      run: |
+        echo "CC=${{matrix.compiler.cc}}" >> $GITHUB_ENV
+        echo "CXX=${{matrix.compiler.cxx}}" >> $GITHUB_ENV
+
+    - name: Build YCM
+      run: |
+        cmake -S .deps/ycm -B .deps/ycm/build
+        cmake --build .deps/ycm/build
+        cmake --install .deps/ycm/build
+
+    - name: Build YARP
+      run: |
+        cmake -S .deps/yarp -B .deps/yarp/build -DSKIP_ACE=ON -DYARP_DISABLE_VERSION_SOURCE=ON
+        cmake --build .deps/yarp/build
+        cmake --install .deps/yarp/build
+
+    - name: Build abb_wrapper
+      run: |
+        cmake -S .deps/abb_wrapper/abb_libegm -B .deps/abb_wrapper/build
+        cmake --build .deps/abb_wrapper/build
+        cmake --install .deps/abb_wrapper/build
+
+    - name: Build matplotlib-cpp
+      run: |
+        cmake -S .deps/matplotlib-cpp -B .deps/matplotlib-cpp/build
+        cmake --build .deps/matplotlib-cpp/build
+        cmake --install .deps/matplotlib-cpp/build
+
+    - name: Build vision
+      run: |
+        cmake -S .deps/vision -B .deps/vision/build -DDOWNLOAD_MODELS=OFF
+        cmake --build .deps/vision/build
+        cmake --install .deps/vision/build
+
+    - name: Configure main project
+      run: |
+        . /opt/ros/rolling/setup.sh
+        cmake -S . -B ./build
+
+    - name: Compile main project
+      run: |
+        . /opt/ros/rolling/setup.sh
+        cmake --build ./build
+
+    - name: Install main project
+      run: cmake --install ./build && ldconfig
+
+    - name: Uninstall main project
+      run: cmake --build ./build --target uninstall
