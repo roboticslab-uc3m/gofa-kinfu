@@ -19,10 +19,7 @@
 #include <yaml-cpp/yaml.h>
 #include <matplotlibcpp.h>
 
-#include <abb_libegm/egm_trajectory_interface.h>
-
 #include <boost/asio.hpp>
-#include <boost/thread.hpp>
 
 #include <yarp/os/Network.h>
 #include <yarp/os/RpcClient.h>
@@ -79,7 +76,7 @@ std::unique_ptr<Robot> Robot::parseRobotConfiguration(const std::string & filena
     }
 }
 
-bool Robot::doSimultaneous(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime)
+bool Robot::doSimultaneous(boost::asio::serial_port & serial, int angle, int turningTime)
 {
     std::cout << "--- EXECUTING SIMULTANEOUSLY ---\n";
 
@@ -110,7 +107,7 @@ bool Robot::doSimultaneous(abb::egm::EGMTrajectoryInterface & egm_interface, boo
     return true;
 }
 
-bool Robot::doSequential(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime)
+bool Robot::doSequential(boost::asio::serial_port & serial, int angle, int turningTime)
 {
     std::cout << "--- EXECUTING SEQUENTIALLY ---\n";
 
@@ -224,100 +221,43 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
         std::cerr << "Warning/Serial Port Error: " << e.what() << ". The script will continue without the physical platform.\n";
     }
 
-    boost::asio::io_context ioContext;
-    boost::thread_group threadGroup;
+    rclcpp::init(0, nullptr);
 
-    abb::egm::EGMTrajectoryInterface egm_interface(ioContext, 6510);
+    jointPublisher = node->create_publisher<std_msgs::msg::Float32MultiArray>("/trajectory/joint", 10);
 
-    if (!egm_interface.isInitialized())
+    if (!jointPublisher)
     {
-        std::cerr << "EGM interface initialization failed\n";
+        std::cerr << "Joint publisher failed to initialize\n";
         return false;
     }
-    else
-    {
-        std::cout << "EGM interface initialized successfully\n";
-    };
 
-    threadGroup.create_thread(boost::bind(&boost::asio::io_context::run, &ioContext));
+    std_msgs::msg::Float32MultiArray jointMsg;
 
-    while (!egm_interface.isConnected())
+    for (const auto & v : initialJointPositions)
     {
-        std::cout << "Attempting to connect...\n";
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        jointMsg.data.push_back(static_cast<float>(v));
     }
-
-    std::vector<double> safePosition = initialJointPositions;
-    abb::egm::wrapper::trajectory::TrajectoryGoal safeTrajectory;
-    abb::egm::wrapper::trajectory::PointGoal * safeGoal = safeTrajectory.add_points();
-
-    for (size_t i = 0; i < safePosition.size(); ++i)
-    {
-        safeGoal->mutable_robot()->mutable_joints()->mutable_position()->add_values(safePosition[i]);
-    }
-
-    safeGoal->set_duration(5.0);
 
     std::cout << "Moving to the safe point...\n";
-    egm_interface.addTrajectory(safeTrajectory);
+    jointPublisher->publish(jointMsg);
 
-    abb::egm::wrapper::trajectory::ExecutionProgress execution_progress1;
-    bool wait1 = true;
-
-    while (wait1)
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-        if (egm_interface.retrieveExecutionProgress(&execution_progress1))
-        {
-            wait1 = execution_progress1.goal_active();
-        }
-    }
-
-    std::cout << "Robot reached the safe point\n";
-
-    threadGroup.create_thread(boost::bind(&boost::asio::io_context::run, &ioContext));
-
-    while (!egm_interface.isConnected())
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
-
-    std::vector<double> firstJointPosition = jointTrajectory[0];
-    abb::egm::wrapper::trajectory::TrajectoryGoal initialTrajectory;
-    abb::egm::wrapper::trajectory::PointGoal* initialGoal = initialTrajectory.add_points();
-
-    for (size_t i = 0; i < firstJointPosition.size(); ++i)
-    {
-        initialGoal->mutable_robot()->mutable_joints()->mutable_position()->add_values(firstJointPosition[i]);
-    }
-
-    initialGoal->set_duration(5.0);
-
-    std::cout << "Moving to the first point...\n";
-    egm_interface.addTrajectory(initialTrajectory);
-
-    abb::egm::wrapper::trajectory::ExecutionProgress execution_progress;
     bool wait = true;
 
     while (wait)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
 
-        if (egm_interface.retrieveExecutionProgress(&execution_progress))
-        {
-            wait = execution_progress.goal_active();
-        }
+    std::cout << "Robot reached the safe point\n";
+
+    std::vector<double> firstJointPosition = jointTrajectory[0];
+
+    std::cout << "Moving to the first point...\n";
+
+    while (wait)
+    {
     }
 
     std::cout << "Robot reached the first point\n";
-
-    threadGroup.create_thread(boost::bind(&boost::asio::io_context::run, &ioContext));
-
-    while (!egm_interface.isConnected())
-    {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    }
 
     sceneReconstruction.resume();
 
@@ -346,9 +286,6 @@ bool Robot::handleExecute(double speed, double radius, std::vector<double> initi
 
         serial.close();
     }
-
-    ioContext.stop();
-    threadGroup.join_all();
 
     return true;
 }
@@ -424,7 +361,6 @@ bool Robot::handleSolveIK(const std::vector<Point> & points, const TrajectoryGen
 
     KDL::ChainIkSolverPos_NR_JL ikSolverPos(chain, q_min, q_max, fkSolverPos, ikSolverVel, 200000, 0.001);
 
-    goal.Clear();
     jointTrajectory.clear();
     jointFlags.clear();
 
@@ -448,8 +384,6 @@ bool Robot::handleSolveIK(const std::vector<Point> & points, const TrajectoryGen
 
     for (const auto & point : points)
     {
-        abb::egm::wrapper::trajectory::PointGoal * trajPoint = goal.add_points();
-
         double angle = startRad - std::atan2(point.y - centroid[1], point.x - centroid[0]);
 
         KDL::Frame desiredPose;
