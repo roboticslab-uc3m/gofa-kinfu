@@ -15,12 +15,6 @@
 
 namespace po = boost::program_options;
 
-std::ostream & operator<<(std::ostream & os, const Point & point)
-{
-    os << "(" << point.x << ", " << point.y << ", " << point.z << ")";
-    return os;
-}
-
 void printRobotData(const std::string & filename)
 {
     try

@@ -4,7 +4,12 @@
 #include <string>
 #include <vector>
 
-#include <abb_libegm/egm_trajectory_interface.h>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+
+#include <std_msgs/msg/float32_multi_array.hpp>
+
+#include <rl_cartesian_control_msgs/action/joint_trajectory.hpp>
 
 #include <boost/asio/serial_port.hpp>
 
@@ -29,9 +34,11 @@ class Robot
 public:
     enum joint_flag {REACHABLE, UNREACHABLE};
 
-    bool handleExecute(double speed, double radius, std::vector<double> initialJointPositions);
-    bool doSimultaneous(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
-    bool doSequential(abb::egm::EGMTrajectoryInterface & egm_interface, boost::asio::serial_port & serial, int angle, int turningTime);
+    ~Robot();
+
+    bool handleExecute(double speed, double radius, const std::vector<double> & initialJointPositions);
+    bool doSimultaneous(boost::asio::serial_port & serial, int angle, int turningTime);
+    bool doSequential(boost::asio::serial_port & serial, int angle, int turningTime);
 
     bool handleSolveIK(const std::vector<Point> & points, const TrajectoryGenerator & trajectory, bool debug);
     bool handlePlotJoints(const TrajectoryGenerator & trajectory, bool debug, const std::string & filename = "");
@@ -39,19 +46,23 @@ public:
     static std::unique_ptr<Robot> parseRobotConfiguration(const std::string & filename);
 
 private:
-    Robot() = default;
+    Robot();
     Robot(const Robot &) = delete;
     Robot & operator=(const Robot &) = delete;
 
     void parseDHParameters(const std::string & filename);
     void parseJointLimits(const std::string & filename);
 
+    bool sendJointTrajectoryGoal(const rl_cartesian_control_msgs::action::JointTrajectory::Goal & goalMsg);
+
     std::vector<DHParameters> dhParams;
     std::vector<JointLimits> jointLimits;
-    std::vector<std::vector<double>> jointTrajectory;
+    std::vector<std_msgs::msg::Float32MultiArray> jointTrajectory;
     std::vector<joint_flag> jointFlags;
 
-    abb::egm::wrapper::trajectory::TrajectoryGoal goal;
+    rclcpp::Node::SharedPtr node;
+    rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr jointPublisher;
+    rclcpp_action::Client<rl_cartesian_control_msgs::action::JointTrajectory>::SharedPtr jointTrajectoryAction;
 };
 
 #endif // __ROBOT_H__

@@ -23,7 +23,7 @@ jobs:
     name: build (${{matrix.compiler.cc}})
     runs-on: ubuntu-latest
     container:
-      image: ros:rolling-ros-core
+      image: ros:rolling-ros-base
 
     strategy:
       fail-fast: false
@@ -47,12 +47,7 @@ jobs:
       with:
         repository: robotology/yarp
         path: .deps/yarp
-
-    - name: Check out abb_wrapper
-      uses: actions/checkout@v7
-      with:
-        repository: roboticslab-uc3m/abb_wrapper
-        path: .deps/abb_wrapper
+        ref: yarp-4.0
 
     - name: Check out matplotlib-cpp
       uses: actions/checkout@v7
@@ -66,8 +61,14 @@ jobs:
         repository: roboticslab-uc3m/vision
         path: .deps/vision
 
+    - name: Check out rl_cartesian_controllers
+      uses: actions/checkout@v7
+      with:
+        repository: roboticslab-uc3m/rl_cartesian_controllers
+        path: .deps/ws/src/rl_cartesian_controllers
+
     - name: Install dependencies via apt
-      run: apt-get update && apt-get install -qq ccache make ${{matrix.compiler.apt}} libprotobuf-dev protobuf-compiler libboost-thread-dev libboost-program-options-dev liborocos-kdl-dev libpython3-dev libyaml-cpp-dev
+      run: apt-get update && apt-get install -qq ccache ${{matrix.compiler.apt}} libboost-program-options-dev liborocos-kdl-dev libpython3-dev libyaml-cpp-dev
 
     - name: Set up Ccache
       uses: hendrikmuhs/ccache-action@v1
@@ -91,12 +92,6 @@ jobs:
         cmake --build .deps/yarp/build
         cmake --install .deps/yarp/build
 
-    - name: Build abb_wrapper
-      run: |
-        cmake -S .deps/abb_wrapper/abb_libegm -B .deps/abb_wrapper/build
-        cmake --build .deps/abb_wrapper/build
-        cmake --install .deps/abb_wrapper/build
-
     - name: Build matplotlib-cpp
       run: |
         cmake -S .deps/matplotlib-cpp -B .deps/matplotlib-cpp/build
@@ -109,14 +104,22 @@ jobs:
         cmake --build .deps/vision/build
         cmake --install .deps/vision/build
 
+    - name: Build rl_cartesian_controllers
+      working-directory: .deps/ws
+      run: |
+        . /opt/ros/rolling/setup.sh
+        colcon build --packages-select rl_cartesian_control_msgs
+
     - name: Configure main project
       run: |
         . /opt/ros/rolling/setup.sh
+        . .deps/ws/install/setup.sh
         cmake -S . -B ./build
 
     - name: Compile main project
       run: |
         . /opt/ros/rolling/setup.sh
+        . .deps/ws/install/setup.sh
         cmake --build ./build
 
     - name: Install main project

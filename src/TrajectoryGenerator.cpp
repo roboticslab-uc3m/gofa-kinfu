@@ -30,7 +30,7 @@ std::unique_ptr<TrajectoryGenerator> TrajectoryGenerator::parseInputParameters(c
     generator->speed = params["speed"].as<double>();
     generator->startPosition = params["start_position"].as<double>() * DEG2RAD;
     generator->endPosition = params["end_position"].as<double>() * DEG2RAD;
-    generator->initialJointPositions = params["initial_joint_positions"].as<std::vector<double>>();
+    generator->initialJointPositions = config["initial_joint_positions"].as<std::vector<double>>();
 
     return generator;
 }
